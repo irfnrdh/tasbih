@@ -1,0 +1,7 @@
+{
+  "name": "tasbih",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "vue-vite"
+}
