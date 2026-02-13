@@ -30,13 +30,13 @@
         <ion-button expand="block" @click="incrementCount">
           Hitung (+)
         </ion-button>
-        
+
         <ion-button expand="block" color="danger" @click="resetCount">
           Reset
         </ion-button>
 
         <ion-note class="ion-text-center">
-          Gunakan Tombol Volume Down Untuk Menghitung 
+          Gunakan Tombol Volume Down Untuk Menghitung
         </ion-note>
       </div>
     </ion-content>
@@ -55,15 +55,15 @@ import {
   IonLabel,
   IonInput,
   IonNote,
-  isPlatform
-} from '@ionic/vue';
-import { defineComponent } from 'vue';
-import { Haptics, ImpactStyle } from '@capacitor/haptics';
-import { VolumeButtons } from '@capacitor-community/volume-buttons';
-import type { VolumeButtonsResult } from '@capacitor-community/volume-buttons';
+  isPlatform,
+} from "@ionic/vue";
+import { defineComponent } from "vue";
+import { Haptics, ImpactStyle } from "@capacitor/haptics";
+import { VolumeButtons } from "@capacitor-community/volume-buttons";
+import type { VolumeButtonsResult } from "@capacitor-community/volume-buttons";
 
 export default defineComponent({
-  name: 'HomePage',
+  name: "HomePage",
   components: {
     IonPage,
     IonHeader,
@@ -74,26 +74,31 @@ export default defineComponent({
     IonItem,
     IonLabel,
     IonInput,
-    IonNote
+    IonNote,
   },
   data() {
     return {
       count: 0,
-      target: 100
-    }
+      target: 100,
+    };
   },
   async mounted() {
     // Setup volume button listener
     const options = {
-      disableSystemVolumeHandler: isPlatform('ios'),
-      suppressVolumeIndicator: isPlatform('android')
+      disableSystemVolumeHandler: isPlatform("ios"),
+      suppressVolumeIndicator: isPlatform("android"),
     };
 
-    await VolumeButtons.watchVolume(options, (result: VolumeButtonsResult) => {
-      if (result.direction === 'down') {
-        this.incrementCount();
-      }
-    });
+    if (isPlatform("hybrid")) {
+      await VolumeButtons.watchVolume(
+        options,
+        (result: VolumeButtonsResult) => {
+          if (result.direction === "down") {
+            this.incrementCount();
+          }
+        },
+      );
+    }
   },
   unmounted() {
     // Cleanup listener
@@ -102,21 +107,21 @@ export default defineComponent({
   methods: {
     async incrementCount() {
       this.count++;
-      
+
       if (this.count >= this.target) {
         await this.vibrate();
       }
     },
     async vibrate() {
-      if (isPlatform('android') || isPlatform('ios')) {
+      if (isPlatform("android") || isPlatform("ios")) {
         await Haptics.vibrate();
         await Haptics.impact({ style: ImpactStyle.Heavy });
       }
     },
     resetCount() {
       this.count = 0;
-    }
-  }
+    },
+  },
 });
 </script>
 
