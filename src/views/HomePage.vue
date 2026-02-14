@@ -35,9 +35,30 @@
           Reset
         </ion-button>
 
+        <!-- Background Mode Toggle -->
+        <ion-item lines="none" class="toggle-item">
+          <ion-label>Mode Layar Mati</ion-label>
+          <ion-toggle
+            :checked="isBackgroundMode"
+            @ionChange="toggleBackgroundMode"
+          ></ion-toggle>
+        </ion-item>
+        <ion-note class="ion-text-center" v-if="isBackgroundMode">
+          Audio hening aktif agar tombol volume tetap bekerja saat layar
+          mati/terkunci.
+        </ion-note>
+
         <ion-note class="ion-text-center">
           Gunakan Tombol Volume Down Untuk Menghitung
         </ion-note>
+
+        <!-- Hidden Audio Element for Background Mode -->
+        <audio ref="silentAudio" loop style="display: none">
+          <source
+            src="data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAATAAZMbGFtZSAzLjk5LjVVQhQAAAAAAAAAQQJGRklEwVEAAACygAAAAAVqyk+pYgA2gAABbAAAAAAAAAAuWloBzA"
+            type="audio/mpeg"
+          />
+        </audio>
       </div>
     </ion-content>
   </ion-page>
@@ -55,12 +76,15 @@ import {
   IonLabel,
   IonInput,
   IonNote,
+  IonToggle,
   isPlatform,
 } from "@ionic/vue";
 import { defineComponent } from "vue";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { VolumeButtons } from "@capacitor-community/volume-buttons";
 import type { VolumeButtonsResult } from "@capacitor-community/volume-buttons";
+import { KeepAwake } from "@capacitor-community/keep-awake";
+import { ForegroundService } from "@capawesome-team/capacitor-android-foreground-service";
 
 export default defineComponent({
   name: "HomePage",
@@ -75,11 +99,13 @@ export default defineComponent({
     IonLabel,
     IonInput,
     IonNote,
+    IonToggle,
   },
   data() {
     return {
       count: 0,
       target: 100,
+      isBackgroundMode: false,
     };
   },
   async mounted() {
@@ -103,6 +129,7 @@ export default defineComponent({
   unmounted() {
     // Cleanup listener
     VolumeButtons.clearWatch();
+    this.disableBackgroundMode();
   },
   methods: {
     async incrementCount() {
@@ -110,6 +137,10 @@ export default defineComponent({
 
       if (this.count >= this.target) {
         await this.vibrate();
+      }
+
+      if (this.isBackgroundMode && isPlatform("android")) {
+        this.updateForegroundServiceNotification();
       }
     },
     async vibrate() {
@@ -120,6 +151,90 @@ export default defineComponent({
     },
     resetCount() {
       this.count = 0;
+      if (this.isBackgroundMode && isPlatform("android")) {
+        this.updateForegroundServiceNotification();
+      }
+    },
+    async toggleBackgroundMode(event: any) {
+      this.isBackgroundMode = event.detail.checked;
+      if (this.isBackgroundMode) {
+        await this.enableBackgroundMode();
+      } else {
+        await this.disableBackgroundMode();
+      }
+    },
+    async enableBackgroundMode() {
+      const audio = this.$refs.silentAudio as HTMLAudioElement;
+      if (audio) {
+        audio
+          .play()
+          .catch((e) => console.error("Error playing silent audio:", e));
+      }
+
+      if (isPlatform("hybrid")) {
+        try {
+          await KeepAwake.keepAwake();
+
+          if (isPlatform("android")) {
+            await this.startForegroundService();
+          }
+        } catch (e) {
+          console.error("Error enabling background/keep awake:", e);
+        }
+      }
+    },
+    async disableBackgroundMode() {
+      const audio = this.$refs.silentAudio as HTMLAudioElement;
+      if (audio) {
+        audio.pause();
+        audio.currentTime = 0;
+      }
+
+      if (isPlatform("hybrid")) {
+        try {
+          await KeepAwake.allowSleep();
+
+          if (isPlatform("android")) {
+            await this.stopForegroundService();
+          }
+        } catch (e) {
+          console.error("Error disabling background/keep awake:", e);
+        }
+      }
+    },
+    async startForegroundService() {
+      try {
+        // Request notification permission if needed (Android 13+)
+        // Note: In real app, check permission status first
+        // await ForegroundService.checkPermissions();
+        await ForegroundService.startForegroundService({
+          id: 12345,
+          title: "Tasbih Digital",
+          body: `Jumlah Dzikir: ${this.count}`,
+          smallIcon: "ic_stat_icon_config_sample", // Default fallback icon
+        });
+      } catch (error) {
+        console.error("Error starting foreground service:", error);
+      }
+    },
+    async stopForegroundService() {
+      try {
+        await ForegroundService.stopForegroundService();
+      } catch (error) {
+        console.error("Error stopping foreground service:", error);
+      }
+    },
+    async updateForegroundServiceNotification() {
+      try {
+        await ForegroundService.updateForegroundService({
+          id: 12345,
+          title: "Tasbih Digital",
+          body: `Jumlah Dzikir: ${this.count}`,
+          smallIcon: "ic_stat_icon_config_sample",
+        });
+      } catch (error) {
+        console.error("Error updating notification:", error);
+      }
     },
   },
 });
@@ -153,5 +268,10 @@ export default defineComponent({
 ion-note {
   display: block;
   margin-top: 20px;
+}
+
+.toggle-item {
+  margin-top: 20px;
+  --background: transparent;
 }
 </style>
