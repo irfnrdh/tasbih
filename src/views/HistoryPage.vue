@@ -11,8 +11,9 @@
 
     <ion-content class="ion-padding">
       <div class="streak-card">
+        <ion-icon class="streak-icon" :icon="flameOutline"></ion-icon>
         <div class="streak-number">{{ streak }}</div>
-        <div class="streak-label">Hari Beruntun 🔥</div>
+        <div class="streak-label">Hari Beruntun</div>
       </div>
 
       <h2 class="section-title">Riwayat Harian</h2>
@@ -66,9 +67,11 @@ import {
   IonItem,
   IonLabel,
   IonButton,
+  IonIcon,
   alertController,
 } from "@ionic/vue";
 import { defineComponent } from "vue";
+import { flameOutline } from "ionicons/icons";
 import { useTasbihStore, DZIKIR_TYPES } from "@/composables/useTasbihStore";
 
 export default defineComponent({
@@ -85,10 +88,11 @@ export default defineComponent({
     IonItem,
     IonLabel,
     IonButton,
+    IonIcon,
   },
   setup() {
     const { history, streak, clearHistory } = useTasbihStore();
-    return { history, streak, clearHistory };
+    return { history, streak, clearHistory, flameOutline };
   },
   methods: {
     nameFor(id: string) {
@@ -130,6 +134,10 @@ export default defineComponent({
   color: white;
   border-radius: 16px;
   margin-bottom: 24px;
+}
+.streak-icon {
+  font-size: 32px;
+  margin-bottom: 4px;
 }
 .streak-number {
   font-size: 64px;

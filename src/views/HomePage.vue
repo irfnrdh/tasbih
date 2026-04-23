@@ -19,11 +19,11 @@
         <!-- Stats pills -->
         <div class="stats-row">
           <div class="pill streak-pill" @click="goHistory">
-            <span class="pill-icon">🔥</span>
+            <ion-icon class="pill-icon" :icon="flameOutline"></ion-icon>
             <span class="pill-text">{{ streak }} hari</span>
           </div>
           <div class="pill today-pill">
-            <span class="pill-icon">📿</span>
+            <ion-icon class="pill-icon" :icon="ribbonOutline"></ion-icon>
             <span class="pill-text">Hari ini: {{ totalToday }}</span>
           </div>
         </div>
@@ -185,6 +185,8 @@ import {
   moonOutline,
   phonePortraitOutline,
   volumeMediumOutline,
+  flameOutline,
+  ribbonOutline,
 } from "ionicons/icons";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { VolumeButtons } from "@capacitor-community/volume-buttons";
@@ -223,6 +225,8 @@ export default defineComponent({
       moonOutline,
       phonePortraitOutline,
       volumeMediumOutline,
+      flameOutline,
+      ribbonOutline,
     };
   },
   data() {
@@ -525,7 +529,7 @@ export default defineComponent({
   background: linear-gradient(135deg, #2bb673, #16805a);
   cursor: default;
 }
-.pill-icon { font-size: 16px; }
+.pill-icon { font-size: 18px; }
 
 /* Dzikir chips */
 .chip-row {
