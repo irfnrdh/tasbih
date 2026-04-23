@@ -1,16 +1,26 @@
 <template>
   <ion-page>
-    <ion-header :translucent="true">
-      <ion-toolbar>
-        <ion-title>Tasbih</ion-title>
-        <ion-buttons slot="end">
-          <ion-button @click="goHistory" aria-label="Riwayat">
-            <ion-icon slot="icon-only" :icon="timeOutline"></ion-icon>
-          </ion-button>
-          <ion-button @click="settingsOpen = true" aria-label="Pengaturan">
-            <ion-icon slot="icon-only" :icon="settingsOutline"></ion-icon>
-          </ion-button>
-        </ion-buttons>
+    <ion-header class="modern-header" :translucent="true">
+      <ion-toolbar class="modern-toolbar">
+        <div class="header-inner">
+          <div class="brand">
+            <div class="brand-mark">
+              <ion-icon :icon="leafOutline"></ion-icon>
+            </div>
+            <div class="brand-text">
+              <div class="greeting">Assalamu'alaikum</div>
+              <div class="app-name">Tasbih Digital</div>
+            </div>
+          </div>
+          <div class="header-actions">
+            <button class="icon-btn" @click="goHistory" aria-label="Riwayat">
+              <ion-icon :icon="timeOutline"></ion-icon>
+            </button>
+            <button class="icon-btn" @click="settingsOpen = true" aria-label="Pengaturan">
+              <ion-icon :icon="settingsOutline"></ion-icon>
+            </button>
+          </div>
+        </div>
       </ion-toolbar>
     </ion-header>
 
@@ -187,6 +197,7 @@ import {
   volumeMediumOutline,
   flameOutline,
   ribbonOutline,
+  leafOutline,
 } from "ionicons/icons";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { VolumeButtons } from "@capacitor-community/volume-buttons";
@@ -227,6 +238,7 @@ export default defineComponent({
       volumeMediumOutline,
       flameOutline,
       ribbonOutline,
+      leafOutline,
     };
   },
   data() {
@@ -483,6 +495,82 @@ export default defineComponent({
 </script>
 
 <style scoped>
+/* Modern header */
+.modern-header ion-toolbar.modern-toolbar {
+  --background: transparent;
+  --border-width: 0;
+  --min-height: 72px;
+  --padding-top: 8px;
+  --padding-bottom: 8px;
+  --padding-start: 0;
+  --padding-end: 0;
+}
+.modern-header::after { display: none !important; }
+.modern-header {
+  background: linear-gradient(135deg, #16805a 0%, #2bb673 60%, #5fd498 100%);
+}
+
+.header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 16px;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: white;
+}
+.brand-mark {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+.brand-text { line-height: 1.15; }
+.greeting {
+  font-size: 11px;
+  opacity: 0.85;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+.app-name {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+.icon-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.icon-btn ion-icon { font-size: 20px; }
+.icon-btn:active {
+  transform: scale(0.92);
+  background: rgba(255, 255, 255, 0.28);
+}
+
 .page-bg {
   --background: linear-gradient(180deg, #f6fbf7 0%, #eaf5ee 100%);
 }
