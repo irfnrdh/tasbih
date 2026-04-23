@@ -1,91 +1,160 @@
 <template>
   <ion-page>
-    <ion-header>
+    <ion-header :translucent="true">
       <ion-toolbar>
-        <ion-title>Tasbih Digital</ion-title>
+        <ion-title>Tasbih</ion-title>
         <ion-buttons slot="end">
-          <ion-button @click="goHistory">
+          <ion-button @click="goHistory" aria-label="Riwayat">
             <ion-icon slot="icon-only" :icon="timeOutline"></ion-icon>
+          </ion-button>
+          <ion-button @click="settingsOpen = true" aria-label="Pengaturan">
+            <ion-icon slot="icon-only" :icon="settingsOutline"></ion-icon>
           </ion-button>
         </ion-buttons>
       </ion-toolbar>
     </ion-header>
 
-    <ion-content class="ion-padding">
-      <div class="counter-container">
-        <!-- Streak banner -->
-        <div class="streak-banner" @click="goHistory">
-          <span>🔥 Streak: <strong>{{ streak }}</strong> hari</span>
-          <span class="today-total">Hari ini: {{ totalToday }}</span>
+    <ion-content :fullscreen="true" class="page-bg">
+      <div class="page-wrap">
+        <!-- Stats pills -->
+        <div class="stats-row">
+          <div class="pill streak-pill" @click="goHistory">
+            <span class="pill-icon">🔥</span>
+            <span class="pill-text">{{ streak }} hari</span>
+          </div>
+          <div class="pill today-pill">
+            <span class="pill-icon">📿</span>
+            <span class="pill-text">Hari ini: {{ totalToday }}</span>
+          </div>
         </div>
 
-        <!-- Dzikir type selector -->
-        <ion-item>
-          <ion-label position="stacked">Jenis Dzikir</ion-label>
-          <ion-select
-            :value="selectedId"
-            interface="action-sheet"
-            @ionChange="onSelectDzikir"
+        <!-- Dzikir chips -->
+        <div class="chip-row">
+          <button
+            v-for="d in DZIKIR_TYPES"
+            :key="d.id"
+            class="dz-chip"
+            :class="{ active: d.id === selectedId }"
+            @click="selectedId = d.id"
           >
-            <ion-select-option
-              v-for="d in DZIKIR_TYPES"
-              :key="d.id"
-              :value="d.id"
-            >
-              {{ d.name }}
-            </ion-select-option>
-          </ion-select>
-        </ion-item>
+            {{ d.name }}
+          </button>
+        </div>
 
+        <!-- Arabic display -->
         <div class="arabic">{{ selectedType.arabic }}</div>
 
-        <!-- Target Input -->
-        <ion-item>
-          <ion-label position="stacked">Target</ion-label>
-          <ion-input
-            type="number"
-            :value="target"
-            :min="1"
-            class="target-input"
-            @ionInput="onTargetInput"
-          ></ion-input>
-        </ion-item>
-
-        <!-- Counter Display -->
-        <div class="counter-display" :class="{ flash: flash }">
-          <h1>{{ count }}</h1>
-          <p>dari {{ target }}</p>
+        <!-- Big tap counter -->
+        <div
+          class="tap-area"
+          :class="{ tapped: flash, complete: count >= target }"
+          @click="incrementCount"
+          role="button"
+          aria-label="Hitung dzikir"
+        >
+          <svg class="ring" viewBox="0 0 220 220">
+            <circle
+              class="ring-bg"
+              cx="110"
+              cy="110"
+              r="100"
+              fill="none"
+              stroke-width="10"
+            />
+            <circle
+              class="ring-fg"
+              cx="110"
+              cy="110"
+              r="100"
+              fill="none"
+              stroke-width="10"
+              stroke-linecap="round"
+              :stroke-dasharray="ringCircumference"
+              :stroke-dashoffset="ringOffset"
+              transform="rotate(-90 110 110)"
+            />
+          </svg>
+          <div class="tap-inner">
+            <div class="count-num">{{ count }}</div>
+            <div class="count-sub">dari {{ target }}</div>
+            <div class="tap-hint" v-if="count === 0">Tap di sini</div>
+          </div>
         </div>
 
-        <!-- Buttons -->
-        <ion-button expand="block" @click="incrementCount">
-          Hitung (+)
-        </ion-button>
+        <!-- Quick actions -->
+        <div class="action-row">
+          <button class="action-btn" @click="resetCount" aria-label="Reset">
+            <ion-icon :icon="refreshOutline"></ion-icon>
+            <span>Reset</span>
+          </button>
+          <button
+            class="action-btn"
+            :class="{ on: isBackgroundMode }"
+            @click="toggleBackgroundFromBtn"
+            aria-label="Mode Layar Mati"
+          >
+            <ion-icon
+              :icon="isBackgroundMode ? moonOutline : phonePortraitOutline"
+            ></ion-icon>
+            <span>{{ isBackgroundMode ? "Background ON" : "Background" }}</span>
+          </button>
+        </div>
 
-        <ion-button expand="block" color="danger" fill="outline" @click="resetCount">
-          Reset {{ selectedType.name }}
-        </ion-button>
-
-        <!-- Background Mode Toggle -->
-        <ion-item lines="none" class="toggle-item">
-          <ion-label>Mode Layar Mati</ion-label>
-          <ion-toggle
-            :checked="isBackgroundMode"
-            @ionChange="toggleBackgroundMode"
-          ></ion-toggle>
-        </ion-item>
-        <ion-note class="ion-text-center" v-if="isBackgroundMode">
-          Audio hening aktif agar tombol volume tetap bekerja saat layar
-          mati/terkunci.
-        </ion-note>
-
-        <ion-note class="ion-text-center">
-          Gunakan Tombol Volume Down Untuk Menghitung
-        </ion-note>
-        <ion-note class="ion-text-center status-note" v-if="volumeStatus">
-          {{ volumeStatus }}
-        </ion-note>
+        <!-- Hint -->
+        <div class="hint-row">
+          <ion-icon :icon="volumeMediumOutline"></ion-icon>
+          <span>Tekan tombol volume bawah untuk menghitung</span>
+        </div>
+        <div v-if="volumeStatus" class="status-note">{{ volumeStatus }}</div>
       </div>
+
+      <!-- Settings modal -->
+      <ion-modal :is-open="settingsOpen" @didDismiss="settingsOpen = false">
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>Pengaturan</ion-title>
+            <ion-buttons slot="end">
+              <ion-button @click="settingsOpen = false">Tutup</ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content class="ion-padding">
+          <ion-list lines="full">
+            <ion-item>
+              <ion-label position="stacked">Target ({{ selectedType.name }})</ion-label>
+              <ion-input
+                type="number"
+                :value="target"
+                :min="1"
+                @ionInput="onTargetInput"
+              ></ion-input>
+            </ion-item>
+            <div class="quick-targets">
+              <button
+                v-for="t in [33, 99, 100, 1000]"
+                :key="t"
+                class="qt-btn"
+                :class="{ active: target === t }"
+                @click="target = t"
+              >
+                {{ t }}
+              </button>
+            </div>
+            <ion-item lines="none">
+              <ion-label>
+                <h3>Mode Layar Mati</h3>
+                <p class="sub-note">
+                  Audio hening menjaga tombol volume aktif saat layar terkunci.
+                </p>
+              </ion-label>
+              <ion-toggle
+                :checked="isBackgroundMode"
+                @ionChange="toggleBackgroundMode"
+              ></ion-toggle>
+            </ion-item>
+          </ion-list>
+        </ion-content>
+      </ion-modal>
     </ion-content>
   </ion-page>
 </template>
@@ -103,14 +172,20 @@ import {
   IonItem,
   IonLabel,
   IonInput,
-  IonNote,
   IonToggle,
-  IonSelect,
-  IonSelectOption,
+  IonModal,
+  IonList,
   isPlatform,
 } from "@ionic/vue";
 import { defineComponent } from "vue";
-import { timeOutline } from "ionicons/icons";
+import {
+  timeOutline,
+  settingsOutline,
+  refreshOutline,
+  moonOutline,
+  phonePortraitOutline,
+  volumeMediumOutline,
+} from "ionicons/icons";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { VolumeButtons } from "@capacitor-community/volume-buttons";
 import type { VolumeButtonsResult } from "@capacitor-community/volume-buttons";
@@ -134,14 +209,21 @@ export default defineComponent({
     IonItem,
     IonLabel,
     IonInput,
-    IonNote,
     IonToggle,
-    IonSelect,
-    IonSelectOption,
+    IonModal,
+    IonList,
   },
   setup() {
     const store = useTasbihStore();
-    return { ...store, timeOutline };
+    return {
+      ...store,
+      timeOutline,
+      settingsOutline,
+      refreshOutline,
+      moonOutline,
+      phonePortraitOutline,
+      volumeMediumOutline,
+    };
   },
   data() {
     return {
@@ -152,13 +234,21 @@ export default defineComponent({
       volumeStatus: "" as string,
       appStateHandle: null as PluginListenerHandle | null,
       keyHandler: null as ((e: KeyboardEvent) => void) | null,
+      settingsOpen: false,
     };
+  },
+  computed: {
+    ringCircumference(): number {
+      return 2 * Math.PI * 100;
+    },
+    ringOffset(): number {
+      const ratio = Math.min(1, this.count / Math.max(1, this.target));
+      return this.ringCircumference * (1 - ratio);
+    },
   },
   async mounted() {
     await this.startVolumeWatcher();
 
-    // Re-attach the watcher every time the app is brought back to the
-    // foreground — some Android OEMs drop the listener after long sleeps.
     if (isPlatform("hybrid")) {
       try {
         this.appStateHandle = await CapApp.addListener(
@@ -172,8 +262,6 @@ export default defineComponent({
       }
     }
 
-    // Web fallback: ArrowDown / VolumeDown key so the volume-down flow
-    // can be exercised in the browser preview before building to Android.
     if (!isPlatform("hybrid")) {
       this.keyHandler = (e: KeyboardEvent) => {
         if (e.key === "ArrowDown" || e.key === "AudioVolumeDown") {
@@ -182,7 +270,8 @@ export default defineComponent({
         }
       };
       window.addEventListener("keydown", this.keyHandler);
-      this.volumeStatus = "Web preview: tekan ArrowDown untuk simulasi tombol volume bawah";
+      this.volumeStatus =
+        "Web preview: tekan ArrowDown untuk simulasi tombol volume bawah";
     }
   },
   async unmounted() {
@@ -207,9 +296,6 @@ export default defineComponent({
     goHistory() {
       this.$router.push("/history");
     },
-    onSelectDzikir(ev: any) {
-      this.selectedId = ev.detail.value;
-    },
     onTargetInput(ev: any) {
       const v = parseInt(ev.detail.value, 10);
       if (!isNaN(v)) this.target = v;
@@ -217,7 +303,6 @@ export default defineComponent({
     async startVolumeWatcher() {
       if (!isPlatform("hybrid")) return;
       try {
-        // Always clear before re-attaching to avoid duplicate handlers
         try { await VolumeButtons.clearWatch(); } catch { /* ignore */ }
         await VolumeButtons.watchVolume(
           {
@@ -237,15 +322,17 @@ export default defineComponent({
       }
     },
     handleVolumeDown() {
-      // Flash visual indicator so the user can confirm the input was received
       this.flash = true;
-      window.setTimeout(() => (this.flash = false), 120);
+      window.setTimeout(() => (this.flash = false), 140);
       this.incrementCount();
     },
     async incrementCount() {
+      this.flash = true;
+      window.setTimeout(() => (this.flash = false), 120);
+      const wasUnder = this.count < this.target;
       this.increment();
 
-      if (this.count >= this.target) {
+      if (wasUnder && this.count >= this.target) {
         await this.vibrate();
       }
 
@@ -255,8 +342,12 @@ export default defineComponent({
     },
     async vibrate() {
       if (isPlatform("android") || isPlatform("ios")) {
-        await Haptics.vibrate();
-        await Haptics.impact({ style: ImpactStyle.Heavy });
+        try {
+          await Haptics.vibrate();
+          await Haptics.impact({ style: ImpactStyle.Heavy });
+        } catch { /* ignore */ }
+      } else if ((navigator as any).vibrate) {
+        try { (navigator as any).vibrate(80); } catch { /* ignore */ }
       }
     },
     resetCount() {
@@ -264,6 +355,9 @@ export default defineComponent({
       if (this.isBackgroundMode && isPlatform("android")) {
         this.updateForegroundServiceNotification();
       }
+    },
+    toggleBackgroundFromBtn() {
+      this.toggleBackgroundMode({ detail: { checked: !this.isBackgroundMode } });
     },
     async toggleBackgroundMode(event: any) {
       this.isBackgroundMode = event.detail.checked;
@@ -385,73 +479,260 @@ export default defineComponent({
 </script>
 
 <style scoped>
-.counter-container {
+.page-bg {
+  --background: linear-gradient(180deg, #f6fbf7 0%, #eaf5ee 100%);
+}
+@media (prefers-color-scheme: dark) {
+  .page-bg {
+    --background: linear-gradient(180deg, #0f1c17 0%, #0a1410 100%);
+  }
+}
+
+.page-wrap {
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   gap: 16px;
-  padding: 12px;
+  padding: 16px;
+  max-width: 480px;
+  margin: 0 auto;
 }
 
-.streak-banner {
+/* Stats pills */
+.stats-row {
   display: flex;
-  justify-content: space-between;
+  gap: 10px;
+}
+.pill {
+  flex: 1;
+  display: flex;
   align-items: center;
-  background: linear-gradient(135deg, #ff9966, #ff5e62);
-  color: white;
-  padding: 12px 16px;
-  border-radius: 12px;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 999px;
   font-size: 14px;
+  font-weight: 600;
+  color: white;
   cursor: pointer;
+  user-select: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
-.streak-banner strong {
-  font-size: 18px;
+.streak-pill {
+  background: linear-gradient(135deg, #ff8a4c, #e8442a);
 }
-.today-total {
-  opacity: 0.95;
+.today-pill {
+  background: linear-gradient(135deg, #2bb673, #16805a);
+  cursor: default;
+}
+.pill-icon { font-size: 16px; }
+
+/* Dzikir chips */
+.chip-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.chip-row::-webkit-scrollbar { display: none; }
+.dz-chip {
+  flex: 0 0 auto;
+  background: rgba(43, 182, 115, 0.12);
+  color: #16805a;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.dz-chip.active {
+  background: linear-gradient(135deg, #2bb673, #16805a);
+  color: white;
+  box-shadow: 0 2px 8px rgba(22, 128, 90, 0.3);
+}
+@media (prefers-color-scheme: dark) {
+  .dz-chip {
+    background: rgba(43, 182, 115, 0.18);
+    color: #6ddca7;
+  }
 }
 
+/* Arabic */
 .arabic {
   text-align: center;
-  font-size: 32px;
-  padding: 12px 0;
+  font-size: 36px;
+  padding: 8px 0 4px;
+  color: #16805a;
+  line-height: 1.4;
   font-family: "Traditional Arabic", "Scheherazade", serif;
-  color: var(--ion-color-primary);
+}
+@media (prefers-color-scheme: dark) {
+  .arabic { color: #6ddca7; }
 }
 
-.counter-display {
+/* Tap area / progress ring */
+.tap-area {
+  position: relative;
+  width: 280px;
+  height: 280px;
+  margin: 8px auto 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.08s ease;
+}
+.tap-area:active { transform: scale(0.97); }
+.tap-area.tapped .ring-fg { filter: drop-shadow(0 0 6px #2bb673); }
+.tap-area.complete .count-num { color: #e8442a; }
+
+.ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.ring-bg {
+  stroke: rgba(43, 182, 115, 0.15);
+}
+.ring-fg {
+  stroke: url(#none);
+  stroke: #2bb673;
+  transition: stroke-dashoffset 0.25s ease;
+}
+
+.tap-inner {
+  position: relative;
   text-align: center;
-  padding: 20px 0;
-  border-radius: 12px;
-  transition: background-color 120ms ease-out;
+  z-index: 1;
+  padding: 24px;
+  border-radius: 50%;
+  background: white;
+  width: 78%;
+  height: 78%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 24px rgba(22, 128, 90, 0.12);
 }
-.counter-display.flash {
-  background-color: rgba(56, 128, 255, 0.18);
+@media (prefers-color-scheme: dark) {
+  .tap-inner {
+    background: #142822;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  }
 }
-.status-note {
+.count-num {
+  font-size: 76px;
+  font-weight: 800;
+  line-height: 1;
+  color: #16805a;
+  font-variant-numeric: tabular-nums;
+}
+@media (prefers-color-scheme: dark) {
+  .count-num { color: #6ddca7; }
+}
+.count-sub {
+  margin-top: 6px;
+  font-size: 14px;
+  color: var(--ion-color-medium);
+}
+.tap-hint {
+  margin-top: 10px;
   font-size: 12px;
   color: var(--ion-color-medium);
-  margin-top: 4px !important;
+  opacity: 0.8;
 }
 
-.counter-display h1 {
-  font-size: 72px;
-  font-weight: bold;
-  margin: 0;
+/* Action row */
+.action-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+.action-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 14px;
+  background: white;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  color: var(--ion-color-dark);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.action-btn ion-icon { font-size: 22px; }
+.action-btn:active { transform: scale(0.97); }
+.action-btn.on {
+  background: linear-gradient(135deg, #2bb673, #16805a);
+  color: white;
+  border-color: transparent;
+}
+@media (prefers-color-scheme: dark) {
+  .action-btn {
+    background: #142822;
+    color: #e0eee8;
+    border-color: rgba(255, 255, 255, 0.06);
+  }
 }
 
-.counter-display p {
-  font-size: 18px;
+/* Hints */
+.hint-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12px;
   color: var(--ion-color-medium);
-  margin: 10px 0 0;
+  margin-top: 4px;
+  text-align: center;
+}
+.hint-row ion-icon { font-size: 14px; }
+.status-note {
+  text-align: center;
+  font-size: 11px;
+  color: var(--ion-color-medium);
+  opacity: 0.75;
 }
 
-ion-note {
-  display: block;
-  margin-top: 16px;
+/* Settings modal helpers */
+.quick-targets {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  flex-wrap: wrap;
 }
-
-.toggle-item {
-  margin-top: 16px;
-  --background: transparent;
+.qt-btn {
+  flex: 1;
+  min-width: 60px;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(43, 182, 115, 0.1);
+  color: #16805a;
+  border: 1px solid transparent;
+  font-weight: 600;
+  cursor: pointer;
+}
+.qt-btn.active {
+  background: #2bb673;
+  color: white;
+}
+.sub-note {
+  font-size: 12px;
+  color: var(--ion-color-medium);
+  white-space: normal;
 }
 </style>
