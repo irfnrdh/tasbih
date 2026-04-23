@@ -52,7 +52,7 @@
         </ion-item>
 
         <!-- Counter Display -->
-        <div class="counter-display">
+        <div class="counter-display" :class="{ flash: flash }">
           <h1>{{ count }}</h1>
           <p>dari {{ target }}</p>
         </div>
@@ -81,6 +81,9 @@
 
         <ion-note class="ion-text-center">
           Gunakan Tombol Volume Down Untuk Menghitung
+        </ion-note>
+        <ion-note class="ion-text-center status-note" v-if="volumeStatus">
+          {{ volumeStatus }}
         </ion-note>
       </div>
     </ion-content>
@@ -113,6 +116,8 @@ import { VolumeButtons } from "@capacitor-community/volume-buttons";
 import type { VolumeButtonsResult } from "@capacitor-community/volume-buttons";
 import { KeepAwake } from "@capacitor-community/keep-awake";
 import { ForegroundService } from "@capawesome-team/capacitor-android-foreground-service";
+import { App as CapApp } from "@capacitor/app";
+import type { PluginListenerHandle } from "@capacitor/core";
 import { useTasbihStore } from "@/composables/useTasbihStore";
 
 export default defineComponent({
@@ -143,28 +148,58 @@ export default defineComponent({
       isBackgroundMode: false,
       audioCtx: null as AudioContext | null,
       silentNode: null as AudioBufferSourceNode | null,
+      flash: false,
+      volumeStatus: "" as string,
+      appStateHandle: null as PluginListenerHandle | null,
+      keyHandler: null as ((e: KeyboardEvent) => void) | null,
     };
   },
   async mounted() {
-    const options = {
-      disableSystemVolumeHandler: isPlatform("ios"),
-      suppressVolumeIndicator: isPlatform("android"),
-    };
+    await this.startVolumeWatcher();
 
+    // Re-attach the watcher every time the app is brought back to the
+    // foreground — some Android OEMs drop the listener after long sleeps.
     if (isPlatform("hybrid")) {
-      await VolumeButtons.watchVolume(
-        options,
-        (result: VolumeButtonsResult) => {
-          if (result.direction === "down") {
-            this.incrementCount();
-          }
-        },
-      );
+      try {
+        this.appStateHandle = await CapApp.addListener(
+          "appStateChange",
+          async ({ isActive }) => {
+            if (isActive) await this.startVolumeWatcher();
+          },
+        );
+      } catch (e) {
+        console.error("Could not attach app state listener:", e);
+      }
+    }
+
+    // Web fallback: ArrowDown / VolumeDown key so the volume-down flow
+    // can be exercised in the browser preview before building to Android.
+    if (!isPlatform("hybrid")) {
+      this.keyHandler = (e: KeyboardEvent) => {
+        if (e.key === "ArrowDown" || e.key === "AudioVolumeDown") {
+          e.preventDefault();
+          this.handleVolumeDown();
+        }
+      };
+      window.addEventListener("keydown", this.keyHandler);
+      this.volumeStatus = "Web preview: tekan ArrowDown untuk simulasi tombol volume bawah";
     }
   },
-  unmounted() {
+  async unmounted() {
     if (isPlatform("hybrid")) {
-      VolumeButtons.clearWatch();
+      try {
+        await VolumeButtons.clearWatch();
+      } catch (e) {
+        console.error("clearWatch error:", e);
+      }
+      if (this.appStateHandle) {
+        try { await this.appStateHandle.remove(); } catch { /* ignore */ }
+        this.appStateHandle = null;
+      }
+    }
+    if (this.keyHandler) {
+      window.removeEventListener("keydown", this.keyHandler);
+      this.keyHandler = null;
     }
     this.disableBackgroundMode();
   },
@@ -178,6 +213,34 @@ export default defineComponent({
     onTargetInput(ev: any) {
       const v = parseInt(ev.detail.value, 10);
       if (!isNaN(v)) this.target = v;
+    },
+    async startVolumeWatcher() {
+      if (!isPlatform("hybrid")) return;
+      try {
+        // Always clear before re-attaching to avoid duplicate handlers
+        try { await VolumeButtons.clearWatch(); } catch { /* ignore */ }
+        await VolumeButtons.watchVolume(
+          {
+            disableSystemVolumeHandler: isPlatform("ios"),
+            suppressVolumeIndicator: isPlatform("android"),
+          },
+          (result: VolumeButtonsResult) => {
+            if (result.direction === "down") {
+              this.handleVolumeDown();
+            }
+          },
+        );
+        this.volumeStatus = "Tombol volume bawah aktif";
+      } catch (e) {
+        console.error("watchVolume failed:", e);
+        this.volumeStatus = "Gagal mengaktifkan tombol volume: " + String(e);
+      }
+    },
+    handleVolumeDown() {
+      // Flash visual indicator so the user can confirm the input was received
+      this.flash = true;
+      window.setTimeout(() => (this.flash = false), 120);
+      this.incrementCount();
     },
     async incrementCount() {
       this.increment();
@@ -358,6 +421,16 @@ export default defineComponent({
 .counter-display {
   text-align: center;
   padding: 20px 0;
+  border-radius: 12px;
+  transition: background-color 120ms ease-out;
+}
+.counter-display.flash {
+  background-color: rgba(56, 128, 255, 0.18);
+}
+.status-note {
+  font-size: 12px;
+  color: var(--ion-color-medium);
+  margin-top: 4px !important;
 }
 
 .counter-display h1 {
