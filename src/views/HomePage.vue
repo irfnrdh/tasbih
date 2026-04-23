@@ -1,22 +1,53 @@
-// src/views/HomePage.vue
 <template>
   <ion-page>
     <ion-header>
       <ion-toolbar>
         <ion-title>Tasbih Digital</ion-title>
+        <ion-buttons slot="end">
+          <ion-button @click="goHistory">
+            <ion-icon slot="icon-only" :icon="timeOutline"></ion-icon>
+          </ion-button>
+        </ion-buttons>
       </ion-toolbar>
     </ion-header>
 
     <ion-content class="ion-padding">
       <div class="counter-container">
+        <!-- Streak banner -->
+        <div class="streak-banner" @click="goHistory">
+          <span>🔥 Streak: <strong>{{ streak }}</strong> hari</span>
+          <span class="today-total">Hari ini: {{ totalToday }}</span>
+        </div>
+
+        <!-- Dzikir type selector -->
+        <ion-item>
+          <ion-label position="stacked">Jenis Dzikir</ion-label>
+          <ion-select
+            :value="selectedId"
+            interface="action-sheet"
+            @ionChange="onSelectDzikir"
+          >
+            <ion-select-option
+              v-for="d in DZIKIR_TYPES"
+              :key="d.id"
+              :value="d.id"
+            >
+              {{ d.name }}
+            </ion-select-option>
+          </ion-select>
+        </ion-item>
+
+        <div class="arabic">{{ selectedType.arabic }}</div>
+
         <!-- Target Input -->
         <ion-item>
-          <ion-label position="stacked">Target Tasbih</ion-label>
+          <ion-label position="stacked">Target</ion-label>
           <ion-input
             type="number"
-            v-model="target"
+            :value="target"
             :min="1"
             class="target-input"
+            @ionInput="onTargetInput"
           ></ion-input>
         </ion-item>
 
@@ -31,8 +62,8 @@
           Hitung (+)
         </ion-button>
 
-        <ion-button expand="block" color="danger" @click="resetCount">
-          Reset
+        <ion-button expand="block" color="danger" fill="outline" @click="resetCount">
+          Reset {{ selectedType.name }}
         </ion-button>
 
         <!-- Background Mode Toggle -->
@@ -51,7 +82,6 @@
         <ion-note class="ion-text-center">
           Gunakan Tombol Volume Down Untuk Menghitung
         </ion-note>
-
       </div>
     </ion-content>
   </ion-page>
@@ -65,19 +95,25 @@ import {
   IonTitle,
   IonContent,
   IonButton,
+  IonButtons,
+  IonIcon,
   IonItem,
   IonLabel,
   IonInput,
   IonNote,
   IonToggle,
+  IonSelect,
+  IonSelectOption,
   isPlatform,
 } from "@ionic/vue";
 import { defineComponent } from "vue";
+import { timeOutline } from "ionicons/icons";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { VolumeButtons } from "@capacitor-community/volume-buttons";
 import type { VolumeButtonsResult } from "@capacitor-community/volume-buttons";
 import { KeepAwake } from "@capacitor-community/keep-awake";
 import { ForegroundService } from "@capawesome-team/capacitor-android-foreground-service";
+import { useTasbihStore } from "@/composables/useTasbihStore";
 
 export default defineComponent({
   name: "HomePage",
@@ -88,23 +124,28 @@ export default defineComponent({
     IonTitle,
     IonContent,
     IonButton,
+    IonButtons,
+    IonIcon,
     IonItem,
     IonLabel,
     IonInput,
     IonNote,
     IonToggle,
+    IonSelect,
+    IonSelectOption,
+  },
+  setup() {
+    const store = useTasbihStore();
+    return { ...store, timeOutline };
   },
   data() {
     return {
-      count: 0,
-      target: 100,
       isBackgroundMode: false,
       audioCtx: null as AudioContext | null,
       silentNode: null as AudioBufferSourceNode | null,
     };
   },
   async mounted() {
-    // Setup volume button listener
     const options = {
       disableSystemVolumeHandler: isPlatform("ios"),
       suppressVolumeIndicator: isPlatform("android"),
@@ -122,13 +163,24 @@ export default defineComponent({
     }
   },
   unmounted() {
-    // Cleanup listener
-    VolumeButtons.clearWatch();
+    if (isPlatform("hybrid")) {
+      VolumeButtons.clearWatch();
+    }
     this.disableBackgroundMode();
   },
   methods: {
+    goHistory() {
+      this.$router.push("/history");
+    },
+    onSelectDzikir(ev: any) {
+      this.selectedId = ev.detail.value;
+    },
+    onTargetInput(ev: any) {
+      const v = parseInt(ev.detail.value, 10);
+      if (!isNaN(v)) this.target = v;
+    },
     async incrementCount() {
-      this.count++;
+      this.increment();
 
       if (this.count >= this.target) {
         await this.vibrate();
@@ -145,7 +197,7 @@ export default defineComponent({
       }
     },
     resetCount() {
-      this.count = 0;
+      this.reset();
       if (this.isBackgroundMode && isPlatform("android")) {
         this.updateForegroundServiceNotification();
       }
@@ -172,8 +224,6 @@ export default defineComponent({
           ctx.resume().catch(() => {});
         }
         if (this.silentNode) return;
-
-        // 2-second silent buffer, looped forever, keeps audio session alive
         const buffer = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
         const source = ctx.createBufferSource();
         source.buffer = buffer;
@@ -204,11 +254,9 @@ export default defineComponent({
     },
     async enableBackgroundMode() {
       this.startSilentAudio();
-
       if (isPlatform("hybrid")) {
         try {
           await KeepAwake.keepAwake();
-
           if (isPlatform("android")) {
             await this.startForegroundService();
           }
@@ -219,11 +267,9 @@ export default defineComponent({
     },
     async disableBackgroundMode() {
       this.stopSilentAudio();
-
       if (isPlatform("hybrid")) {
         try {
           await KeepAwake.allowSleep();
-
           if (isPlatform("android")) {
             await this.stopForegroundService();
           }
@@ -234,9 +280,6 @@ export default defineComponent({
     },
     async startForegroundService() {
       try {
-        // Android 13+ requires runtime POST_NOTIFICATIONS permission,
-        // otherwise the foreground notification never shows and the OS
-        // can kill the process when the screen is off.
         try {
           const status = await ForegroundService.checkPermissions();
           if (status.display !== "granted") {
@@ -245,11 +288,10 @@ export default defineComponent({
         } catch (permErr) {
           console.warn("Notification permission check failed:", permErr);
         }
-
         await ForegroundService.startForegroundService({
           id: 12345,
           title: "Tasbih Digital",
-          body: `Jumlah Dzikir: ${this.count}`,
+          body: `${this.selectedType.name}: ${this.count}`,
           smallIcon: "ic_stat_icon_config_sample",
         });
       } catch (error) {
@@ -268,7 +310,7 @@ export default defineComponent({
         await ForegroundService.updateForegroundService({
           id: 12345,
           title: "Tasbih Digital",
-          body: `Jumlah Dzikir: ${this.count}`,
+          body: `${this.selectedType.name}: ${this.count}`,
           smallIcon: "ic_stat_icon_config_sample",
         });
       } catch (error) {
@@ -283,13 +325,39 @@ export default defineComponent({
 .counter-container {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  padding: 20px;
+  gap: 16px;
+  padding: 12px;
+}
+
+.streak-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(135deg, #ff9966, #ff5e62);
+  color: white;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.streak-banner strong {
+  font-size: 18px;
+}
+.today-total {
+  opacity: 0.95;
+}
+
+.arabic {
+  text-align: center;
+  font-size: 32px;
+  padding: 12px 0;
+  font-family: "Traditional Arabic", "Scheherazade", serif;
+  color: var(--ion-color-primary);
 }
 
 .counter-display {
   text-align: center;
-  padding: 30px 0;
+  padding: 20px 0;
 }
 
 .counter-display h1 {
@@ -306,11 +374,11 @@ export default defineComponent({
 
 ion-note {
   display: block;
-  margin-top: 20px;
+  margin-top: 16px;
 }
 
 .toggle-item {
-  margin-top: 20px;
+  margin-top: 16px;
   --background: transparent;
 }
 </style>
