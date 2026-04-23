@@ -101,6 +101,10 @@ screenshots/                # Tangkapan layar untuk README
 | `npm run test:unit`   | Unit test (Vitest)                      |
 | `npm run test:e2e`    | E2E test (Cypress)                      |
 
+## Creator
+
+Dibuat oleh **[irfnrdh](https://github.com/irfnrdh)**.
+
 ## Lisensi
 
-Pribadi / belum ditentukan.
+Dirilis di bawah [MIT License](LICENSE) © 2026 irfnrdh.
