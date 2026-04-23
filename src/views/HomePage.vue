@@ -52,13 +52,6 @@
           Gunakan Tombol Volume Down Untuk Menghitung
         </ion-note>
 
-        <!-- Hidden Audio Element for Background Mode -->
-        <audio ref="silentAudio" loop style="display: none">
-          <source
-            src="data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAATAAZMbGFtZSAzLjk5LjVVQhQAAAAAAAAAQQJGRklEwVEAAACygAAAAAVqyk+pYgA2gAABbAAAAAAAAAAuWloBzA"
-            type="audio/mpeg"
-          />
-        </audio>
       </div>
     </ion-content>
   </ion-page>
@@ -106,6 +99,8 @@ export default defineComponent({
       count: 0,
       target: 100,
       isBackgroundMode: false,
+      audioCtx: null as AudioContext | null,
+      silentNode: null as AudioBufferSourceNode | null,
     };
   },
   async mounted() {
@@ -163,13 +158,52 @@ export default defineComponent({
         await this.disableBackgroundMode();
       }
     },
-    async enableBackgroundMode() {
-      const audio = this.$refs.silentAudio as HTMLAudioElement;
-      if (audio) {
-        audio
-          .play()
-          .catch((e) => console.error("Error playing silent audio:", e));
+    startSilentAudio() {
+      try {
+        if (!this.audioCtx) {
+          const Ctx =
+            (window as any).AudioContext ||
+            (window as any).webkitAudioContext;
+          if (!Ctx) return;
+          this.audioCtx = new Ctx();
+        }
+        const ctx = this.audioCtx as AudioContext;
+        if (ctx.state === "suspended") {
+          ctx.resume().catch(() => {});
+        }
+        if (this.silentNode) return;
+
+        // 2-second silent buffer, looped forever, keeps audio session alive
+        const buffer = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        source.loop = true;
+        const gain = ctx.createGain();
+        gain.gain.value = 0;
+        source.connect(gain).connect(ctx.destination);
+        source.start(0);
+        this.silentNode = source;
+      } catch (e) {
+        console.error("Error starting silent audio:", e);
       }
+    },
+    stopSilentAudio() {
+      try {
+        if (this.silentNode) {
+          this.silentNode.stop();
+          this.silentNode.disconnect();
+          this.silentNode = null;
+        }
+        if (this.audioCtx) {
+          this.audioCtx.close().catch(() => {});
+          this.audioCtx = null;
+        }
+      } catch (e) {
+        console.error("Error stopping silent audio:", e);
+      }
+    },
+    async enableBackgroundMode() {
+      this.startSilentAudio();
 
       if (isPlatform("hybrid")) {
         try {
@@ -184,11 +218,7 @@ export default defineComponent({
       }
     },
     async disableBackgroundMode() {
-      const audio = this.$refs.silentAudio as HTMLAudioElement;
-      if (audio) {
-        audio.pause();
-        audio.currentTime = 0;
-      }
+      this.stopSilentAudio();
 
       if (isPlatform("hybrid")) {
         try {
@@ -204,14 +234,23 @@ export default defineComponent({
     },
     async startForegroundService() {
       try {
-        // Request notification permission if needed (Android 13+)
-        // Note: In real app, check permission status first
-        // await ForegroundService.checkPermissions();
+        // Android 13+ requires runtime POST_NOTIFICATIONS permission,
+        // otherwise the foreground notification never shows and the OS
+        // can kill the process when the screen is off.
+        try {
+          const status = await ForegroundService.checkPermissions();
+          if (status.display !== "granted") {
+            await ForegroundService.requestPermissions();
+          }
+        } catch (permErr) {
+          console.warn("Notification permission check failed:", permErr);
+        }
+
         await ForegroundService.startForegroundService({
           id: 12345,
           title: "Tasbih Digital",
           body: `Jumlah Dzikir: ${this.count}`,
-          smallIcon: "ic_stat_icon_config_sample", // Default fallback icon
+          smallIcon: "ic_stat_icon_config_sample",
         });
       } catch (error) {
         console.error("Error starting foreground service:", error);
