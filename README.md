@@ -12,13 +12,18 @@ Aplikasi tasbih digital modern berbasis Ionic Vue 3 + Capacitor. Mendukung berag
 
 ## Fitur
 
-- **Beragam jenis dzikir** — Subhanallah, Alhamdulillah, Allahu Akbar, La ilaha illallah, Astaghfirullah, Shalawat Nabi, dan mode bebas. Setiap jenis punya counter dan target sendiri.
+- **11 jenis dzikir lengkap** — Subhanallah, Alhamdulillah, Allahu Akbar, La ilaha illallah, Astaghfirullah, Shalawat Nabi, Subhanallah wa bihamdihi, Subhanallahil 'Azhim, La hawla wa la quwwata illa billah, Hasbunallah wa ni'mal Wakil, Bismillah, plus mode bebas. Setiap jenis punya counter dan target sendiri, lengkap dengan teks Arab dan terjemahan.
+- **Mode Rutinitas (Tasbihat otomatis)** — Sekali pilih, app otomatis berjalan: Subhanallah 33× → Alhamdulillah 33× → Allahu Akbar 34× → tahlil. Tersedia juga preset Istighfar 100× dan Shalawat 100×.
+- **Tombol Undo** — Salah tap? Tinggal kurangi satu hitungan tanpa kehilangan progress.
+- **Total Seumur Hidup** — Akumulasi semua dzikir yang pernah dihitung, ditampilkan di halaman Riwayat.
+- **Suara klik opsional** — Bunyi lembut tiap hitungan plus chime tiga nada saat target tercapai (bisa dimatikan).
+- **Animasi selesai** — Overlay perayaan ("MasyaAllah!") muncul saat target tercapai.
 - **Area tap besar** — Lingkaran progress di tengah layar adalah tombol hitung. Cincin hijau mengisi sesuai persentase target.
 - **Tombol volume bawah** — Hitung tanpa melihat layar (Android/iOS via Capacitor plugin).
 - **Mode Layar Mati (background)** — Foreground service Android + Web Audio silent loop + KeepAwake supaya tombol volume tetap aktif saat HP terkunci.
 - **Riwayat harian otomatis** — Setiap hari dicatat per jenis dzikir.
 - **Streak** — Jumlah hari berturut-turut dengan minimal satu dzikir.
-- **Penyimpanan lokal** — Semua data tersimpan di perangkat (localStorage).
+- **Penyimpanan lokal** — Semua data tersimpan di perangkat (localStorage), tanpa server, tanpa akun.
 - **Haptic feedback** — Getar saat target tercapai (mobile + Vibration API di web).
 - **Dark mode otomatis** mengikuti pengaturan sistem.
 - **Header modern** dengan gradien hijau emerald dan sapaan Assalamu'alaikum.

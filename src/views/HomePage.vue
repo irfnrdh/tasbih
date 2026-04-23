@@ -38,6 +38,26 @@
           </div>
         </div>
 
+        <!-- Routine banner (when active) -->
+        <div v-if="activeRoutine" class="routine-banner">
+          <div class="routine-info">
+            <div class="routine-name">
+              <ion-icon :icon="layersOutline"></ion-icon>
+              {{ activeRoutine.name }}
+            </div>
+            <div class="routine-progress">
+              Tahap {{ routineStepNumber }} dari {{ activeRoutine.steps.length }}
+            </div>
+          </div>
+          <button class="routine-cancel" @click="cancelRoutine" aria-label="Batalkan rutinitas">
+            <ion-icon :icon="closeOutline"></ion-icon>
+          </button>
+        </div>
+        <button v-else class="routine-start" @click="routinesOpen = true">
+          <ion-icon :icon="layersOutline"></ion-icon>
+          <span>Mulai Rutinitas</span>
+        </button>
+
         <!-- Dzikir chips -->
         <div class="chip-row">
           <button
@@ -53,6 +73,9 @@
 
         <!-- Arabic display -->
         <div class="arabic">{{ selectedType.arabic }}</div>
+        <div v-if="selectedType.translation" class="translation">
+          "{{ selectedType.translation }}"
+        </div>
 
         <!-- Big tap counter -->
         <div
@@ -93,6 +116,10 @@
 
         <!-- Quick actions -->
         <div class="action-row">
+          <button class="action-btn" @click="undoCount" :disabled="count === 0" aria-label="Undo">
+            <ion-icon :icon="arrowUndoOutline"></ion-icon>
+            <span>Undo</span>
+          </button>
           <button class="action-btn" @click="resetCount" aria-label="Reset">
             <ion-icon :icon="refreshOutline"></ion-icon>
             <span>Reset</span>
@@ -106,7 +133,7 @@
             <ion-icon
               :icon="isBackgroundMode ? moonOutline : phonePortraitOutline"
             ></ion-icon>
-            <span>{{ isBackgroundMode ? "Background ON" : "Background" }}</span>
+            <span>{{ isBackgroundMode ? "Aktif" : "Layar Mati" }}</span>
           </button>
         </div>
 
@@ -117,6 +144,43 @@
         </div>
         <div v-if="volumeStatus" class="status-note">{{ volumeStatus }}</div>
       </div>
+
+      <!-- Celebration overlay -->
+      <transition name="celebrate">
+        <div v-if="celebration" class="celebrate-overlay" @click="celebration = ''">
+          <div class="celebrate-card">
+            <ion-icon :icon="checkmarkCircle" class="celebrate-icon"></ion-icon>
+            <div class="celebrate-title">{{ celebration }}</div>
+            <div v-if="celebrateSub" class="celebrate-sub">{{ celebrateSub }}</div>
+          </div>
+        </div>
+      </transition>
+
+      <!-- Routine picker modal -->
+      <ion-modal :is-open="routinesOpen" @didDismiss="routinesOpen = false">
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>Pilih Rutinitas</ion-title>
+            <ion-buttons slot="end">
+              <ion-button @click="routinesOpen = false">Tutup</ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content class="ion-padding">
+          <div class="routine-list">
+            <button
+              v-for="r in ROUTINES"
+              :key="r.id"
+              class="routine-card"
+              @click="pickRoutine(r.id)"
+            >
+              <div class="routine-card-name">{{ r.name }}</div>
+              <div class="routine-card-desc">{{ r.description }}</div>
+              <div class="routine-card-meta">{{ r.steps.length }} tahap</div>
+            </button>
+          </div>
+        </ion-content>
+      </ion-modal>
 
       <!-- Settings modal -->
       <ion-modal :is-open="settingsOpen" @didDismiss="settingsOpen = false">
@@ -150,6 +214,16 @@
                 {{ t }}
               </button>
             </div>
+            <ion-item lines="none">
+              <ion-label>
+                <h3>Suara Klik</h3>
+                <p class="sub-note">Bunyi pendek tiap kali menghitung</p>
+              </ion-label>
+              <ion-toggle
+                :checked="soundEnabled"
+                @ionChange="(e: any) => soundEnabled = e.detail.checked"
+              ></ion-toggle>
+            </ion-item>
             <ion-item lines="none">
               <ion-label>
                 <h3>Mode Layar Mati</h3>
@@ -198,6 +272,10 @@ import {
   flameOutline,
   ribbonOutline,
   leafOutline,
+  arrowUndoOutline,
+  layersOutline,
+  closeOutline,
+  checkmarkCircle,
 } from "ionicons/icons";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { VolumeButtons } from "@capacitor-community/volume-buttons";
@@ -239,6 +317,10 @@ export default defineComponent({
       flameOutline,
       ribbonOutline,
       leafOutline,
+      arrowUndoOutline,
+      layersOutline,
+      closeOutline,
+      checkmarkCircle,
     };
   },
   data() {
@@ -251,6 +333,10 @@ export default defineComponent({
       appStateHandle: null as PluginListenerHandle | null,
       keyHandler: null as ((e: KeyboardEvent) => void) | null,
       settingsOpen: false,
+      routinesOpen: false,
+      celebration: "" as string,
+      celebrateSub: "" as string,
+      celebrateTimer: 0 as number,
     };
   },
   computed: {
@@ -260,6 +346,12 @@ export default defineComponent({
     ringOffset(): number {
       const ratio = Math.min(1, this.count / Math.max(1, this.target));
       return this.ringCircumference * (1 - ratio);
+    },
+    routineStepNumber(): number {
+      const r = (this as any).activeRoutine;
+      const step = (this as any).routineStep;
+      if (!r || !step) return 0;
+      return r.steps.indexOf(step) + 1;
     },
   },
   async mounted() {
@@ -316,6 +408,10 @@ export default defineComponent({
       const v = parseInt(ev.detail.value, 10);
       if (!isNaN(v)) this.target = v;
     },
+    pickRoutine(id: string) {
+      this.startRoutine(id);
+      this.routinesOpen = false;
+    },
     async startVolumeWatcher() {
       if (!isPlatform("hybrid")) return;
       try {
@@ -342,16 +438,103 @@ export default defineComponent({
       window.setTimeout(() => (this.flash = false), 140);
       this.incrementCount();
     },
+    playClickSound() {
+      if (!this.soundEnabled) return;
+      try {
+        const Ctx =
+          (window as any).AudioContext ||
+          (window as any).webkitAudioContext;
+        if (!Ctx) return;
+        const ctx = new Ctx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = 880;
+        osc.type = "sine";
+        gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.15, ctx.currentTime + 0.005);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.08);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.09);
+        setTimeout(() => ctx.close().catch(() => {}), 150);
+      } catch { /* ignore */ }
+    },
+    playCompletionChime() {
+      try {
+        const Ctx =
+          (window as any).AudioContext ||
+          (window as any).webkitAudioContext;
+        if (!Ctx) return;
+        const ctx = new Ctx();
+        const tones = [523.25, 659.25, 783.99]; // C5, E5, G5
+        tones.forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.frequency.value = freq;
+          osc.type = "sine";
+          const start = ctx.currentTime + i * 0.12;
+          gain.gain.setValueAtTime(0.0001, start);
+          gain.gain.exponentialRampToValueAtTime(0.2, start + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.4);
+          osc.connect(gain).connect(ctx.destination);
+          osc.start(start);
+          osc.stop(start + 0.45);
+        });
+        setTimeout(() => ctx.close().catch(() => {}), 1000);
+      } catch { /* ignore */ }
+    },
+    showCelebration(title: string, sub: string = "") {
+      this.celebration = title;
+      this.celebrateSub = sub;
+      if (this.celebrateTimer) window.clearTimeout(this.celebrateTimer);
+      this.celebrateTimer = window.setTimeout(() => {
+        this.celebration = "";
+        this.celebrateSub = "";
+      }, 2200);
+    },
     async incrementCount() {
       this.flash = true;
       window.setTimeout(() => (this.flash = false), 120);
+      this.playClickSound();
+
       const wasUnder = this.count < this.target;
       this.increment();
 
       if (wasUnder && this.count >= this.target) {
         await this.vibrate();
+        this.playCompletionChime();
+
+        if (this.activeRoutine) {
+          // Auto-advance routine
+          const dzikirName = this.selectedType.name;
+          const result = this.advanceRoutine();
+          if (result.done) {
+            this.showCelebration(
+              "Alhamdulillah!",
+              "Rutinitas selesai. Semoga diterima Allah.",
+            );
+          } else {
+            this.showCelebration(
+              `${dzikirName} selesai`,
+              `Lanjut: ${this.selectedType.name} (${this.target}x)`,
+            );
+          }
+        } else {
+          this.showCelebration(
+            "MasyaAllah!",
+            `Target ${this.target}x ${this.selectedType.name} tercapai`,
+          );
+        }
       }
 
+      if (this.isBackgroundMode && isPlatform("android")) {
+        this.updateForegroundServiceNotification();
+      }
+    },
+    undoCount() {
+      this.undo();
+      this.flash = true;
+      window.setTimeout(() => (this.flash = false), 120);
       if (this.isBackgroundMode && isPlatform("android")) {
         this.updateForegroundServiceNotification();
       }
@@ -584,7 +767,7 @@ export default defineComponent({
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 16px;
+  gap: 14px;
   padding: 16px;
   max-width: 480px;
   margin: 0 auto;
@@ -618,6 +801,105 @@ export default defineComponent({
   cursor: default;
 }
 .pill-icon { font-size: 18px; }
+
+/* Routine */
+.routine-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, #6a7cff, #4a3aff);
+  color: white;
+  padding: 10px 14px;
+  border-radius: 14px;
+  box-shadow: 0 2px 10px rgba(74, 58, 255, 0.25);
+}
+.routine-info { display: flex; flex-direction: column; gap: 2px; }
+.routine-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 14px;
+}
+.routine-name ion-icon { font-size: 16px; }
+.routine-progress { font-size: 12px; opacity: 0.9; }
+.routine-cancel {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.routine-cancel ion-icon { font-size: 18px; }
+
+.routine-start {
+  background: white;
+  border: 1px dashed rgba(43, 182, 115, 0.5);
+  color: #16805a;
+  padding: 10px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+@media (prefers-color-scheme: dark) {
+  .routine-start {
+    background: #142822;
+    color: #6ddca7;
+    border-color: rgba(109, 220, 167, 0.4);
+  }
+}
+
+/* Routine list (modal) */
+.routine-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.routine-card {
+  text-align: left;
+  background: white;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 14px;
+  padding: 14px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: all 0.15s;
+}
+.routine-card:active { transform: scale(0.98); }
+.routine-card-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #16805a;
+}
+.routine-card-desc {
+  font-size: 13px;
+  color: var(--ion-color-medium);
+}
+.routine-card-meta {
+  font-size: 11px;
+  color: var(--ion-color-medium);
+  margin-top: 4px;
+}
+@media (prefers-color-scheme: dark) {
+  .routine-card {
+    background: #142822;
+    border-color: rgba(255, 255, 255, 0.06);
+  }
+  .routine-card-name { color: #6ddca7; }
+}
 
 /* Dzikir chips */
 .chip-row {
@@ -657,11 +939,18 @@ export default defineComponent({
 /* Arabic */
 .arabic {
   text-align: center;
-  font-size: 36px;
-  padding: 8px 0 4px;
+  font-size: 32px;
+  padding: 6px 0 0;
   color: #16805a;
   line-height: 1.4;
   font-family: "Traditional Arabic", "Scheherazade", serif;
+}
+.translation {
+  text-align: center;
+  font-size: 12px;
+  color: var(--ion-color-medium);
+  font-style: italic;
+  margin-top: 2px;
 }
 @media (prefers-color-scheme: dark) {
   .arabic { color: #6ddca7; }
@@ -670,9 +959,9 @@ export default defineComponent({
 /* Tap area / progress ring */
 .tap-area {
   position: relative;
-  width: 280px;
-  height: 280px;
-  margin: 8px auto 0;
+  width: 260px;
+  height: 260px;
+  margin: 4px auto 0;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -692,11 +981,8 @@ export default defineComponent({
   width: 100%;
   height: 100%;
 }
-.ring-bg {
-  stroke: rgba(43, 182, 115, 0.15);
-}
+.ring-bg { stroke: rgba(43, 182, 115, 0.15); }
 .ring-fg {
-  stroke: url(#none);
   stroke: #2bb673;
   transition: stroke-dashoffset 0.25s ease;
 }
@@ -723,7 +1009,7 @@ export default defineComponent({
   }
 }
 .count-num {
-  font-size: 76px;
+  font-size: 70px;
   font-weight: 800;
   line-height: 1;
   color: #16805a;
@@ -766,8 +1052,12 @@ export default defineComponent({
   cursor: pointer;
   transition: all 0.15s;
 }
+.action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 .action-btn ion-icon { font-size: 22px; }
-.action-btn:active { transform: scale(0.97); }
+.action-btn:not(:disabled):active { transform: scale(0.97); }
 .action-btn.on {
   background: linear-gradient(135deg, #2bb673, #16805a);
   color: white;
@@ -827,4 +1117,55 @@ export default defineComponent({
   color: var(--ion-color-medium);
   white-space: normal;
 }
+
+/* Celebration overlay */
+.celebrate-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+.celebrate-card {
+  background: white;
+  border-radius: 20px;
+  padding: 28px 32px;
+  text-align: center;
+  max-width: 320px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+}
+@media (prefers-color-scheme: dark) {
+  .celebrate-card { background: #142822; color: white; }
+}
+.celebrate-icon {
+  font-size: 56px;
+  color: #2bb673;
+}
+.celebrate-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin-top: 8px;
+  color: #16805a;
+}
+@media (prefers-color-scheme: dark) {
+  .celebrate-title { color: #6ddca7; }
+}
+.celebrate-sub {
+  font-size: 13px;
+  color: var(--ion-color-medium);
+  margin-top: 4px;
+}
+.celebrate-enter-active, .celebrate-leave-active {
+  transition: opacity 0.25s ease;
+}
+.celebrate-enter-from, .celebrate-leave-to { opacity: 0; }
+.celebrate-enter-active .celebrate-card,
+.celebrate-leave-active .celebrate-card {
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.celebrate-enter-from .celebrate-card { transform: scale(0.7); }
+.celebrate-leave-to .celebrate-card { transform: scale(0.9); }
 </style>

@@ -10,10 +10,17 @@
     </ion-header>
 
     <ion-content class="ion-padding">
-      <div class="streak-card">
-        <ion-icon class="streak-icon" :icon="flameOutline"></ion-icon>
-        <div class="streak-number">{{ streak }}</div>
-        <div class="streak-label">Hari Beruntun</div>
+      <div class="stats-grid">
+        <div class="streak-card">
+          <ion-icon class="streak-icon" :icon="flameOutline"></ion-icon>
+          <div class="streak-number">{{ streak }}</div>
+          <div class="streak-label">Hari Beruntun</div>
+        </div>
+        <div class="lifetime-card">
+          <ion-icon class="streak-icon" :icon="trophyOutline"></ion-icon>
+          <div class="streak-number">{{ lifetimeTotal.toLocaleString("id-ID") }}</div>
+          <div class="streak-label">Total Seumur Hidup</div>
+        </div>
       </div>
 
       <h2 class="section-title">Riwayat Harian</h2>
@@ -71,7 +78,7 @@ import {
   alertController,
 } from "@ionic/vue";
 import { defineComponent } from "vue";
-import { flameOutline } from "ionicons/icons";
+import { flameOutline, trophyOutline } from "ionicons/icons";
 import { useTasbihStore, DZIKIR_TYPES } from "@/composables/useTasbihStore";
 
 export default defineComponent({
@@ -91,8 +98,8 @@ export default defineComponent({
     IonIcon,
   },
   setup() {
-    const { history, streak, clearHistory } = useTasbihStore();
-    return { history, streak, clearHistory, flameOutline };
+    const { history, streak, lifetimeTotal, clearHistory } = useTasbihStore();
+    return { history, streak, lifetimeTotal, clearHistory, flameOutline, trophyOutline };
   },
   methods: {
     nameFor(id: string) {
@@ -127,14 +134,27 @@ export default defineComponent({
 </script>
 
 <style scoped>
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 24px;
+}
 .streak-card {
   text-align: center;
-  padding: 30px 20px;
+  padding: 22px 14px;
   background: linear-gradient(135deg, #ff9966, #ff5e62);
   color: white;
   border-radius: 16px;
-  margin-bottom: 24px;
 }
+.lifetime-card {
+  text-align: center;
+  padding: 22px 14px;
+  background: linear-gradient(135deg, #2bb673, #16805a);
+  color: white;
+  border-radius: 16px;
+}
+.lifetime-card .streak-number { font-size: 28px; word-break: break-all; }
 .streak-icon {
   font-size: 32px;
   margin-bottom: 4px;
