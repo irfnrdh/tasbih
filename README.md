@@ -57,13 +57,23 @@ npm run dev
 
 Server dev jalan di `http://localhost:5000`. Di preview web, tombol **ArrowDown** keyboard akan mensimulasikan tombol volume bawah.
 
-## Build untuk Android
+### Build Otomatis (Rekomendasi)
+Saya sudah menyediakan script satu-klik untuk memproses build web, sinkronisasi, dan generate APK:
 
+```bash
+npm run build:apk
+```
+
+Hasil APK akan berada di: `android/app/build/outputs/apk/debug/app-debug.apk`
+
+### Build Manual
+Jika ingin melakukannya secara manual:
 ```bash
 npm run build
 npx cap sync android
 npx cap open android   # buka di Android Studio, lalu Run
 ```
+
 
 > **Penting (HP merek tertentu)**: Di Xiaomi/Oppo/Vivo/Huawei, masuk **Settings → Apps → Tasbih → Battery → No restrictions** dan matikan Battery Optimization agar foreground service tidak dimatikan paksa oleh sistem.
 
@@ -105,6 +115,7 @@ screenshots/                # Tangkapan layar untuk README
 | `npm run lint`        | Lint dengan ESLint                      |
 | `npm run test:unit`   | Unit test (Vitest)                      |
 | `npm run test:e2e`    | E2E test (Cypress)                      |
+| `npm run build:apk`   | Build & generate APK (Android)          |
 
 ## Creator
 

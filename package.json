@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "test:e2e": "cypress run",
     "test:unit": "vitest",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "build:apk": "./build-apk.sh"
   },
   "dependencies": {
     "@capacitor-community/keep-awake": "^5.0.0",
